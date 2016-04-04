@@ -123,75 +123,48 @@ int rawN,rawM;
 set<int> mustPoints;
 
 
-const int maxn = 700;
+const int MAX_V = 700;
 struct Edge
 {
     int rid;
-    int from,to,cap,flow;
+    int to,cap,rev;
 };
-
-struct Dinic
+struct Ford
 {
-    int n,m,s,t;
-    vector<Edge> edges;
-    vector<int> G[maxn];
-    bool vis[maxn];
-    int d[maxn];
-    int cur[maxn];
-
+    vector<Edge> G[MAX_V];
+    bool used[MAX_V];
     void AddEdge(int rid, int from, int to, int cap){
-        edges.push_back((Edge){rid,from,to,cap,0});
-        edges.push_back((Edge){-1,to,from,0,0});
-        m = edges.size();
-        G[from].push_back(m-2);
-        G[to].push_back(m-1);
+        G[from].push_back((Edge){rid, to, cap, (int)G[to].size()});
+        G[to].push_back((Edge){-1, from, 0, (int)G[from].size()-1});
     }
-    bool BFS(){
-        memset(vis, 0, sizeof vis);
-        queue<int> Q;
-        Q.push(s);
-        d[s] = 0;
-        vis[s] = 1;
-        while(!Q.empty()){
-            int x = Q.front(); Q.pop();
-            for(int i = 0; i < G[x].size(); i++){
-                Edge& e = edges[G[x][i]];
-                if(!vis[e.to] && e.cap > e.flow){
-                    vis[e.to] = 1;
-                    d[e.to] = d[x] + 1;
-                    Q.push(e.to);
+    int dfs(int v,int t,int f){
+        if(v == t) return f;
+        used[v] = true;
+        for(int i = 0; i < G[v].size(); i++){
+            Edge &e = G[v][i];
+            if(!used[e.to] && e.cap > 0){
+                int d = dfs(e.to, t, min(f, e.cap));
+                if(d > 0){
+                    e.cap -= d;
+                    G[e.to][e.rev].cap += d;
+                    return d;
                 }
             }
         }
-        return vis[t];
+        return 0;
     }
-    int DFS(int x, int a){
-        if(x == t || a == 0) return a;
-        int flow = 0, f;
-        for(int& i = cur[x]; i < G[x].size(); i++){
-            Edge& e = edges[G[x][i]];
-            if(d[x] + 1 == d[e.to] && (f = DFS(e.to, min(a, e.cap-e.flow))) > 0){
-                e.flow += f;
-                edges[G[x][i]^1].flow -= f;
-                flow += f;
-                a -= f;
-                if(a == 0) break;
-            }
-        }
-        return flow;
-    }
-    int MaxFlow(int s, int t){
-        this -> s = s; this -> t = t;
+    int MaxFlow(int s,int t){
         int flow = 0;
-        while(BFS()){
-            memset(cur, 0, sizeof cur);
-            flow += DFS(s, INF);
+        while(true){
+            memset(used, 0, sizeof used);
+            int f = dfs(s, t, INF);
+            if(f == 0) return flow;
+            flow += f;
         }
-        return flow;
     }
-}dinic;
+}ford;
 
-int mirrorl2r[maxn],mirrorr2l[maxn];
+int mirrorl2r[MAX_V],mirrorr2l[MAX_V];
 int superS,superT;
 vii raw_mirror;
 void makeGraph(){
@@ -206,47 +179,43 @@ void makeGraph(){
     }
     superS = indx++;
     superT = indx++;
-
     // raw_mirror.pb(mkp(superS,superT));
 
-    dinic.AddEdge(-1,superS,rawS,1);
+    ford.AddEdge(-1,superS,rawS,1);
     rep(i,raw_mirror.size()){
-        dinic.AddEdge(-1,superS,raw_mirror[i].X,1);
+        ford.AddEdge(-1,superS,raw_mirror[i].X,1);
     }
     //原先点中,V'到V'的点需要改动到V'到mirror V'上去
     rep(i,rawedges.size()){
         RawEdge& e = rawedges[i];
         if(mirrorl2r[e.from]!=-1 && mirrorl2r[e.to]!=-1){
-            dinic.AddEdge(e.id, e.from, mirrorl2r[e.to], 1);
+            ford.AddEdge(e.id, e.from, mirrorl2r[e.to], 1);
         }else if(mirrorl2r[e.from]!=-1){
-            dinic.AddEdge(e.id,e.from,e.to,1);
-            // dinic.AddEdge(e.id,mirrorl2r[e.from],e.to,1);  //右侧点不需要superT以外的出度
+            ford.AddEdge(e.id,e.from,e.to,1);
+            // ford.AddEdge(e.id,mirrorl2r[e.from],e.to,1);  //右侧点不需要superT以外的出度
         }else if(mirrorl2r[e.to]!=-1){
-            // dinic.AddEdge(e.id,e.from,e.to,1); //左侧点不需要superS以外的入度
-            dinic.AddEdge(e.id,e.from,mirrorl2r[e.to],1);
+            // ford.AddEdge(e.id,e.from,e.to,1); //左侧点不需要superS以外的入度
+            ford.AddEdge(e.id,e.from,mirrorl2r[e.to],1);
         }else if(e.from == rawS && e.to == rawT){
-            if(mustPoints.size() == 0) dinic.AddEdge(e.id,e.from,e.to,1);
+            if(mustPoints.size() == 0) ford.AddEdge(e.id,e.from,e.to,1);
         }else if(e.to == rawS || e.from == rawT){
             //do nothing
         }else{
-            dinic.AddEdge(e.id,e.from,e.to,1);
+            ford.AddEdge(e.id,e.from,e.to,1);
         }
     }
     rep(i,raw_mirror.size()){
-        dinic.AddEdge(-1,raw_mirror[i].Y,superT,1);
+        ford.AddEdge(-1,raw_mirror[i].Y,superT,1);
     }
-    dinic.AddEdge(-1,rawT,superT,1);
+    ford.AddEdge(-1,rawT,superT,1);
 
-    dinic.n = indx;
-    dinic.m = dinic.edges.size();
-    dinic.s = superS; dinic.t = superT;
 }
 
 void solve(){
     if(K) puts("solve");
     makeGraph();
     if(K) puts("makeGraph end");
-    printf("%d\n",dinic.MaxFlow(superS,superT));
+    printf("%d\n",ford.MaxFlow(superS,superT));
 }
 
 
