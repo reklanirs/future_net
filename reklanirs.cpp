@@ -6,7 +6,8 @@
 #endif
 #define MAX_SEARCH_TIME 9
 */
-const int K = 1;
+const int K = 0;
+const int KK = 0;
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -159,7 +160,9 @@ struct Ford
         else return x;
     }
     void trigger(int v){
-        if(v == rawS){
+        if(v == -1){
+            curS = -1; forbid1=forbid2=-2;
+        }else if(v == rawS){
             curS = rawS;
             if(mustPoints.size() != 0) forbid1 = rawT;
             forbid2 = rawS;
@@ -170,7 +173,7 @@ struct Ford
         }
     }
     int dfs(int v,int t,int f,int pre = -1, bool preEisrev = false){
-        if(K) printf("\t%d %d %d %d %d\n",v,t,f,pre,preEisrev );
+        if(K) printf("\tv:%d G[v].size():%d t:%d f:%d pre:%d preEisrev:%d\n",v,G[v].size(),t,f,pre,preEisrev );
         affectS.insert(headtail[v].X);
         affectT.insert(headtail[v].Y);
         if(v == t){
@@ -181,10 +184,11 @@ struct Ford
             affectT.insert(curT);
             return f;
         }
-        
+        if(KK) puts("a");
         used[v] = true;
         for(int i = 0; i < G[v].size(); i++){
             Edge &e = G[v][i];
+            if(K) printf("\t\te: %d %d %d\n",e.to,e.cap,e.isrev);
 
             //不能走到禁止节点,也不能掐断流向禁止节点的流
             if(e.to == forbid1 || e.to == forbid2) continue;
@@ -193,9 +197,10 @@ struct Ford
 
                 //trigger
                 if(e.to == rawS || mustPoint[e.to]) trigger(e.to);
-
+                if(KK) puts("b");
                 //掐断之前一条流. 需要更新curS,forbid
                 if(e.isrev){
+                    if(KK) puts("c");
                     int precurS = curS;
                     curS = headtail[e.to].X;
                     trigger(curS);
@@ -213,6 +218,7 @@ struct Ford
                         trigger(curS);
                     }
                 }else{
+                    if(KK) puts("d");
                     int d = dfs(e.to, t, min(f, e.cap),v, false);
                     if(d > 0){
                         prenxt[v].Y = e.to;
@@ -223,7 +229,7 @@ struct Ford
                         return d;
                     }
                 }
-
+                if(e.to == rawS || mustPoint[e.to]) trigger(-1);
             }
         }
         return 0;
@@ -232,7 +238,7 @@ struct Ford
         int flow = 0;
         rep(i,MAX_V) connectl2r[i]=connectr2l[i]=i,headtail[i]=prenxt[i]=mkp(-1,-1);
         while(true){
-            if(K) printf("%d\n", flow);
+            if(K) printf("curMaxFlow:%d\n", flow);
             memset(used, 0, sizeof used);
             affectS.clear();
             affectT.clear();
@@ -240,7 +246,11 @@ struct Ford
 
             int f = dfs(s, t, INF);
 
-            if(K) printf("\tf:%d\n",f);
+            if(K){
+                printf("\tf:%d\n",f);
+                printf("(%d-%d) ",rawS,connectl2r[rawS] );
+                for(int i:mustPoints) printf("(%d-%d) ",i,mirrorr2l[connectl2r[i]] ); puts("");
+            }
             if(f == 0) return flow;
             flow += f;
 
@@ -261,6 +271,10 @@ struct Ford
                 }
             }
         }
+    }
+
+    void output(){
+        
     }
 }ford;
 
@@ -322,12 +336,19 @@ void makeGraph(){
 void solve(){
     if(K) puts("solve");
     makeGraph();
-    if(K) puts("makeGraph end");
+    if(K){
+        puts("makeGraph end");
+        printf("superS:%d superT:%d\n", superS, superT);
+        printf("left : %2d",rawS ); for(int i:mustPoints) printf(" %2d",i ); puts("");
+        printf("right: %2d",rawT ); for(int i:mustPoints) printf(" %2d",mirrorl2r[i] ); puts("");
+    }
     int f = ford.MaxFlow(superS,superT);
-    printf("MaxFlow:%d\n",f);
+    if(K) printf("MaxFlow:%d\n",f);
     if(f != mustPoints.size() + 1){
         puts("Error");
         return;
+    }else{
+        ford.output();
     }
     //output answer
 }
