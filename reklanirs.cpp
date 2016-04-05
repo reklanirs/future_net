@@ -6,7 +6,7 @@
 #endif
 #define MAX_SEARCH_TIME 9
 */
-const int K = 1;
+const int K = 0;
 const int KK = 0;
 #include <iostream>
 #include <iomanip>
@@ -19,7 +19,6 @@ const int KK = 0;
 #include <vector>
 #include <set>
 #include <map>
-#include <unordered_map>
 #include <queue>
 #include <deque>
 #include <stack>
@@ -115,7 +114,7 @@ struct RawEdge
     RawEdge(char *s){
         vector<string> tmpv;
         split(s,',',tmpv);
-        id = stoi(tmpv[0]); from = stoi(tmpv[1]); to = stoi(tmpv[2]); value = stoi(tmpv[3]);
+        id = atoi(tmpv[0].c_str()); from = atoi(tmpv[1].c_str()); to = atoi(tmpv[2].c_str()); value = atoi(tmpv[3].c_str());
     }
 };
 vector<RawEdge> rawedges;
@@ -329,7 +328,6 @@ struct Ford
 
 void makeGraph(){
     raw_mirror.clear();
-    int indx = rawN;
     memset(mirrorl2r, -1, sizeof mirrorl2r);
     memset(mirrorr2l, -1, sizeof mirrorr2l);
     memset(mirror2Raw, -1, sizeof mirror2Raw);
@@ -419,12 +417,12 @@ void search_route(char *topo[5000], int edge_num, char *demand){
     rawM = rawedges.size();
 
     vector<string> v = split(demand,',');
-    rawS = stoi(v[0]);
-    rawT = stoi(v[1]);
+    rawS = atoi(v[0].c_str());
+    rawT = atoi(v[1].c_str());
     v = split(v[v.size()-1], '|');
     memset(mustPoint, 0, sizeof mustPoint);
     rep(i,v.size()){
-        int tmp = stoi(v[i]);
+        int tmp = atoi(v[i].c_str());
         mustPoints.insert(tmp);
         mustPoint[tmp] = true;
     }
