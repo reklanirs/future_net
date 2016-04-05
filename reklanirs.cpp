@@ -6,7 +6,7 @@
 #endif
 #define MAX_SEARCH_TIME 9
 */
-const int K = 0;
+const int K = 1;
 const int KK = 0;
 #include <iostream>
 #include <iomanip>
@@ -90,6 +90,8 @@ template<class T> inline T cub(T a){return a*a*a;}
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 /**////////////////////////////////////////////////////////////////////////////////////////////
+
+
 int startTime =(int)time(NULL);
 
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
@@ -142,7 +144,6 @@ struct Ford
     bool used[MAX_V];
 
 
-    int connectl2r[MAX_V],connectr2l[MAX_V];//V' -> mirror V'
     pii headtail[MAX_V]; //
     pii prenxt[MAX_V];
     int curS,curT;
@@ -155,8 +156,8 @@ struct Ford
     }
     pii findhead(int x){
         if(!mustPoint[x]) return mkp(x,0);
-        if(connectr2l[mirrorl2r[x]] != mirrorl2r[x]){
-            pii tmp = findhead(connectr2l[mirrorl2r[x]]);
+        if(prenxt[mirrorl2r[x]].X != -1){
+            pii tmp = findhead(prenxt[mirrorl2r[x]].X);
             return mkp(tmp.X,tmp.Y+1);
         }
         else return mkp(x,0);
@@ -177,13 +178,13 @@ struct Ford
         }
     }
     int dfs(int v,int t,int f,int pre = -1, bool preEisrev = false){
-        if(K) printf("\tv:%d G[v].size():%d t:%d f:%d pre:%d preEisrev:%d\n",v,G[v].size(),t,f,pre,preEisrev );
+        if(KK) printf("\tv:%d G[v].size():%d t:%d f:%d pre:%d preEisrev:%d\n",v,G[v].size(),t,f,pre,preEisrev );
         affectS.insert(headtail[v].X);
         affectT.insert(headtail[v].Y);
         if(v == t){
             //
             curT = pre;
-            connectl2r[curS] = curT; connectr2l[curT] = curS;
+            // connectl2r[curS] = curT; connectr2l[curT] = curS;
             affectS.insert(curS);
             affectT.insert(curT);
             return f;
@@ -240,7 +241,9 @@ struct Ford
     }
     int MaxFlow(int s = superS,int t = superT){
         int flow = 0;
-        rep(i,MAX_V) connectl2r[i]=connectr2l[i]=i,headtail[i]=prenxt[i]=mkp(-1,-1);
+        rep(i,MAX_V) 
+            // connectl2r[i]=connectr2l[i]=i,
+            headtail[i]=prenxt[i]=mkp(-1,-1);
         while(true){
             if(K) printf("curMaxFlow:%d\n", flow);
             memset(used, 0, sizeof used);
@@ -273,8 +276,8 @@ struct Ford
                 }
             }
             if(K){
-                printf("(%d-%d) ",rawS,connectl2r[rawS] );
-                for(int i:mustPoints) printf("(%d-%d) ",i,mirrorr2l[connectl2r[i]] ); puts("");
+                printf("(%d-%d) ",rawS,headtail[rawS].Y );
+                for(int i:mustPoints) printf("(%d-%d)",i,mirrorr2l[headtail[i].Y] ); puts("");
             }
         }
     }
@@ -315,11 +318,19 @@ struct Ford
             }
             tmp = nxt;
         }
-        if(K) printf("route:\n");
-        rep(i,ans.size()) printf("%d ", ans[i]); puts("");
+        SI tmps;
+        if(K){
+            printf("route:\n");
+            rep(i,ans.size()) printf("%d ", ans[i]); puts("");
+        }
         if(K){
             rep(i,ans.size()){
                 printf("%d %d\n",rawedges[ans[i]].from,rawedges[ans[i]].to );
+                tmps.insert(rawedges[ans[i]].from);
+                tmps.insert(rawedges[ans[i]].to);
+            }
+            for(int i:mustPoints){
+                if(tmps.find(i) == tmps.end()) printf("Error! no node:%d\n",i );
             }
         }
     }
@@ -335,7 +346,7 @@ void makeGraph(){
         mirror2Raw[i]=mirror2Raw[i+rawN]=i;
         if(i == rawS || i == rawT) continue;
         mirrorl2r[i] = i+rawN; mirrorr2l[i+rawN] = i;
-        ford.AddEdge(-1, i, i+rawN, 1);
+        if(!mustPoint[i]) ford.AddEdge(-1, i, i+rawN, 1);
     }
     superS = 2*rawN;
     superT = 2*rawN+1;
@@ -384,7 +395,7 @@ void solve(){
     makeGraph();
     if(K){
         puts("makeGraph end");
-        printf("superS:%d superT:%d\n", superS, superT);
+        printf("superS:%d superT:%d mustnodenum:%d\n", superS, superT, mustPoints.size());
         printf("left : %2d",rawS ); for(int i:mustPoints) printf(" %2d",i ); puts("");
         printf("right: %2d",rawT ); for(int i:mustPoints) printf(" %2d",mirrorl2r[i] ); puts("");
     }
@@ -407,7 +418,7 @@ void search_route(char *topo[5000], int edge_num, char *demand){
     rawedges.clear();
     for (int i = 0; i < edge_num; i++){
         RawEdge e = RawEdge(topo[i]);
-        if(K){
+        if(KK){
             printf("%d %d %d %d\n",e.id,e.from,e.to,e.value );
         }
         smax(rawN, e.from); smax(rawN, e.to);
@@ -436,6 +447,7 @@ char demand[5000];
 int main(int argc, char *argv[]){
 
     freopen(argv[1],"r",stdin);
+    // freopen("out.txt","w",stdout);
     rep(i,5000) topo[i] = new char[500];
     int edge_num = 0;
     while(~scanf("\n%s\n",topo[edge_num++]));
