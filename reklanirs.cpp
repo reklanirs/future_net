@@ -154,11 +154,22 @@ struct Ford
         G[to].push_back((Edge){-1, from, 0, (int)G[from].size()-1,true});
     }
     int findhead(int x){
-        if(x == rawS) return x;
+        if(!mustPoint[x]) return x;
         if(connectr2l[mirrorl2r[x]] != mirrorl2r[x]) return findhead(connectr2l[mirrorl2r[x]]);
         else return x;
     }
-    int dfs(int v,int t,int f,int pre = -1, int preEisrev = false){
+    void trigger(int v){
+        if(v == rawS){
+            curS = rawS;
+            if(mustPoints.size() != 0) forbid1 = rawT;
+            forbid2 = rawS;
+        }else if(mustPoint[v]){
+            curS = v;
+            forbid1 = mirrorl2r[curS];
+            forbid2 = mirrorl2r[findhead(curS)];
+        }
+    }
+    int dfs(int v,int t,int f,int pre = -1, bool preEisrev = false){
         if(K) printf("\t%d %d %d %d %d\n",v,t,f,pre,preEisrev );
         affectS.insert(headtail[v].X);
         affectT.insert(headtail[v].Y);
@@ -181,19 +192,13 @@ struct Ford
             if(!used[e.to] && e.cap > 0){
 
                 //trigger
-                if(e.to == rawS || mirrorl2r[e.to]!=-1){
-
-                    curS = e.to;
-                    forbid1 = mirrorl2r[curS];
-                    forbid2 = mirrorl2r[findhead(curS)];
-                }
+                if(e.to == rawS || mustPoint[e.to]) trigger(e.to);
 
                 //掐断之前一条流. 需要更新curS,forbid
                 if(e.isrev){
                     int precurS = curS;
                     curS = headtail[e.to].X;
-                    forbid1 = mirrorl2r[curS];
-                    forbid2 = mirrorl2r[findhead(curS)];
+                    trigger(curS);
 
                     int d = dfs(e.to, t, min(f, e.cap),v,true);
                     if(d > 0){
@@ -205,8 +210,7 @@ struct Ford
                         return d;
                     }else{
                         curS = precurS;
-                        forbid1 = mirrorl2r[curS];
-                        forbid2 = mirrorl2r[findhead(curS)];
+                        trigger(curS);
                     }
                 }else{
                     int d = dfs(e.to, t, min(f, e.cap),v, false);
@@ -220,17 +224,11 @@ struct Ford
                     }
                 }
 
-                //reset trigger ?
-                if(e.to == rawS || mirrorl2r[e.to]!=-1){
-                    curS = e.to;
-                    forbid1 = mirrorl2r[curS];
-                    forbid2 = mirrorl2r[findhead(curS)];
-                }
             }
         }
         return 0;
     }
-    int MaxFlow(int s,int t){
+    int MaxFlow(int s = superS,int t = superT){
         int flow = 0;
         rep(i,MAX_V) connectl2r[i]=connectr2l[i]=i,headtail[i]=prenxt[i]=mkp(-1,-1);
         while(true){
@@ -238,12 +236,16 @@ struct Ford
             memset(used, 0, sizeof used);
             affectS.clear();
             affectT.clear();
+            forbid1 = forbid2 = -2;
+
             int f = dfs(s, t, INF);
+
+            if(K) printf("\tf:%d\n",f);
             if(f == 0) return flow;
             flow += f;
 
             for(SI::iterator ite = affectS.begin(); ite!=affectS.end(); ite++){
-                if(*ite == -1) continue;
+                if(*ite < 0) continue;
                 int tmp = *ite;
                 while(tmp != superT){
                     headtail[tmp].X = *ite;
@@ -251,7 +253,7 @@ struct Ford
                 }
             }
             for(SI::iterator ite = affectT.begin(); ite!=affectT.end(); ite++){
-                if(*ite == -1) continue;
+                if(*ite < 0) continue;
                 int tmp = *ite;
                 while(tmp != superS){
                     headtail[tmp].Y = *ite;
@@ -270,9 +272,9 @@ void makeGraph(){
     memset(mirrorr2l, -1, sizeof mirrorr2l);
     memset(mirror2Raw, -1, sizeof mirror2Raw);
     rep(i,rawN){
+        mirror2Raw[i]=mirror2Raw[i+rawN]=i;
         if(i == rawS || i == rawT) continue;
         mirrorl2r[i] = i+rawN; mirrorr2l[i+rawN] = i;
-        mirror2Raw[i]=mirror2Raw[i+rawN]=i;
         ford.AddEdge(-1, i, i+rawN, 1);
     }
     superS = 2*rawN;
@@ -289,7 +291,17 @@ void makeGraph(){
     //原先点中,V'到V'的点需要改动到V'到mirror V'上去
     rep(i,rawedges.size()){
         RawEdge& e = rawedges[i];
-        if(mustPoint[e.from] && mustPoint[e.to]){
+        if(e.from == rawS && e.to == rawT){
+            if(mustPoints.size() == 0) ford.AddEdge(e.id,e.from,e.to,1);
+        }else if(e.to == rawS || e.from == rawT){
+            //do nothing
+        }else if(e.from == rawS){
+            if(mustPoint[e.to]) ford.AddEdge(e.id, e.from, mirrorl2r[e.to], 1);
+            else ford.AddEdge(e.id, e.from, e.to, 1);
+        }else if(e.to == rawT){
+            if(mustPoint[e.from]) ford.AddEdge(e.id, e.from, e.to, 1);
+            else ford.AddEdge(e.id, mirrorl2r[e.from], e.to, 1);
+        }else if(mustPoint[e.from] && mustPoint[e.to]){
             ford.AddEdge(e.id, e.from, mirrorl2r[e.to], 1);
         }else if(mustPoint[e.from]){
             ford.AddEdge(e.id,e.from,e.to,1);
@@ -297,11 +309,7 @@ void makeGraph(){
         }else if(mustPoint[e.to]){
             // ford.AddEdge(e.id,e.from,e.to,1); //左侧点不需要superS以外的入度
             ford.AddEdge(e.id,mirrorl2r[e.from],mirrorl2r[e.to],1);
-        }else if(e.from == rawS && e.to == rawT){
-            if(mustPoints.size() == 0) ford.AddEdge(e.id,e.from,e.to,1);
-        }else if(e.to == rawS || e.from == rawT){
-            //do nothing
-        }else{
+        }else {
             ford.AddEdge(e.id,mirrorl2r[e.from],e.to,1);
         }
     }
@@ -318,7 +326,7 @@ void solve(){
     int f = ford.MaxFlow(superS,superT);
     printf("MaxFlow:%d\n",f);
     if(f != mustPoints.size() + 1){
-        pus("Error");
+        puts("Error");
         return;
     }
     //output answer
@@ -332,6 +340,9 @@ void search_route(char *topo[5000], int edge_num, char *demand){
     rawedges.clear();
     for (int i = 0; i < edge_num; i++){
         RawEdge e = RawEdge(topo[i]);
+        if(K){
+            printf("%d %d %d %d\n",e.id,e.from,e.to,e.value );
+        }
         smax(rawN, e.from); smax(rawN, e.to);
         rawedges.pb(e);
     }
