@@ -1,14 +1,13 @@
-//41.5
+//74.41
 #include "lib_record.h"
 #include "route.h"
 #include "lib_io.h"
-#define MAX_SEARCH_TIME 9
-
+#define MAX_SEARCH_TIME 15
 using namespace std;
-#define MAX_POINT_NUM 600
+#define MAX_POINT_NUM 700
 #define MP make_pair
 typedef pair<int, int> PII;
-const int INF = INT_MAX / 2;
+const int INF = INT_MAX / 10;
 int startTime =(int)time(NULL);
 
 struct Edge
@@ -38,7 +37,11 @@ vector<Edge> G[MAX_POINT_NUM];
 
 int startPoint, endPoint;
 set<int> mustPoints;
-set<int> inPath;
+vector<bool> isMustPoint(MAX_POINT_NUM, false);
+//set<int> inPath;
+
+vector<bool> inRoad(MAX_POINT_NUM, false);
+
 int edge_num;
 int inPathVPCnt = 0;
 
@@ -46,70 +49,80 @@ int inPathVPCnt = 0;
 map<PII,Edge> edgeIdMap;
 
 vector<int> ans;
-int bestLen = INF;
+int bestLen = 1000;
 vector<int> finalAns;
-struct Dij
+struct FastDij
 {
-    bool vis[MAX_POINT_NUM];
+
     int dis[MAX_POINT_NUM];
     int pre[MAX_POINT_NUM];
+    //int vis[MAX_POINT_NUM];
     void run(int cur)
     {
-        memset(vis, 0, sizeof vis);
+
+        //cout<<"start DIJ"<<cur<<endl;
+        //cout<<inPathVPCnt<<endl;
+        priority_queue< PII, vector<PII>, greater<PII> > que;
+
         memset(pre,-1,sizeof pre);
+        // memset(vis,false,sizeof vis);
         fill(dis, dis + MAX_POINT_NUM, INF);
+
+        que.push(MP(0,cur));
         dis[cur] = 0;
 
-        set<PII> que;
-        que.insert(MP(0, cur));
-        int cnt = 0;
-        bool foundEnd = false;
-        while (!que.empty())
+        bool visDis = false;
+        int visVp = 0;
+        while(!que.empty())
         {
-            PII p = *que.begin();
-            que.erase(p);
-            int curPoint = p.second;
-            if (vis[curPoint])
+
+            if(visDis && visVp == mustPoints.size() - inPathVPCnt)
             {
-                continue;
+                break;
             }
-            vis[curPoint] = true;
+            PII curPoint = que.top();
+            que.pop();
+            int cp = curPoint.second;
+            int cd = curPoint.first;
 
-            if(curPoint == endPoint){ //不能从终点扩展
-                foundEnd = true;
-                continue;
-            }
-            if(mustPoints.count(curPoint) != 0){
-                ++cnt;
-                if(cnt >= mustPoints.size() - inPathVPCnt && foundEnd){ //所有v'都搜过了，剩下就不用了
-
-                    break;
-                }
-            }
-
-            int n = G[curPoint].size();
-            for (int i = 0; i < n; i++)
+            if(dis[cp] == cd)
+                //if(!vis[cp])
             {
-                int nextPoint = G[curPoint][i].v;
-                if (inPath.count(nextPoint) != 0)
+                //vis[cp] = true;
+                if(cp == endPoint)
                 {
+                    visDis = true;
                     continue;
                 }
-                int oldDis = dis[nextPoint];
-                int newDis = p.first + G[curPoint][i].w;
-                if (newDis < oldDis)
+                if(isMustPoint[cp])
                 {
-                    if(que.count(MP(oldDis, nextPoint)) != 0)
+
+                    visVp++;
+                    //out<<"got V'"<<cp<<" "<<mustPoints.size()<<" "<<visVp<<endl;
+                }
+                for(int i=0; i<G[cp].size(); i++)
+                {
+                    const Edge& e = G[cp][i];
+                    if(inRoad[e.v])
                     {
-                        que.erase(MP(oldDis, nextPoint));
+                        continue;
+                    }
+                    int oDis = dis[e.v];
+                    int nDis = cd + e.w;
+                    if(nDis < oDis)
+                    {
+                        dis[e.v] = nDis;
+                        pre[e.v] = cp;
+                        que.push(MP(nDis,e.v));
+
                     }
 
-                    que.insert(MP(newDis, nextPoint));
-                    pre[nextPoint] = curPoint;
-                    dis[nextPoint] = newDis;
                 }
+
             }
+
         }
+
     }
 
     vector<int> endWith(int t)
@@ -127,10 +140,9 @@ struct Dij
 
 
 
-
 void dfs(int cur,int dis)
 {
-
+    //cout<<"dfs"<<cur<<" "<<dis<<endl;
     if(dis >= bestLen )
     {
         return;
@@ -145,48 +157,64 @@ void dfs(int cur,int dis)
 
     if (cur == endPoint)
     {
+        cout<<"find "<<dis<<endl;
         bestLen = dis;
         finalAns = ans;
         return;
     }
 
 
-    inPath.insert(cur);
-    Dij dij;
-    dij.run(cur);
 
+    //Dij dij;
+    FastDij dij;
+    dij.run(cur);
+    if(dij.dis[endPoint] == INF)
+    {
+        return;
+    }
 
     //order by dis
     vector<PII> candidates;
+    bool allCanGo = true;
     //todo remove and add
     for(set<int>::iterator i = mustPoints.begin(); i!=mustPoints.end(); ++i)
     {
-        if(inPath.count(*i) == 0)
+        if(inRoad[*i] == false && *i != cur)
         {
             candidates.push_back(MP(dij.dis[*i],*i));
+            if(dij.dis[*i] == INF)
+            {
+                allCanGo = false;
+                break;
+            }
         }
     }
+    if(!allCanGo)
+    {
+        return;
+    }
+
     if(candidates.size() == 0)
     {
+
         candidates.push_back(MP(dij.dis[endPoint],endPoint));
     }
     //if(candidates.size() != 0)
     //{
     sort(candidates.begin(),candidates.end());
-    inPathVPCnt++;
-    for(int i=0; i<candidates.size(); i++)
+    inRoad[cur] = true;
+    if(cur != startPoint)
+        inPathVPCnt++;
+    int cSize = candidates.size();
+    for(int i=0; i<cSize; i++)
     {
         vector<int> path;
         int curPoint = candidates[i].second; // next point V' to go
-        if(dij.dis[curPoint] == INF)
-        {
-            continue;
-        }
         vector<int> vp = dij.endWith(curPoint);
         int cnt = vp.size();
         for(int i=0; i<cnt; i++)
         {
-            inPath.insert(vp[i]);
+            inRoad[vp[i]] = true;
             ans.push_back(vp[i]);
         }
 
@@ -194,51 +222,87 @@ void dfs(int cur,int dis)
 
         while(cnt--)
         {
-            inPath.erase(ans.back());
+            inRoad[ans.back()] = false;
             ans.pop_back();
         }
+
     }
-    inPathVPCnt--;
-    inPath.erase(cur);
+    if(cur != startPoint)
+        inPathVPCnt--;
+    inRoad[cur] = false;
     return;
-    //}
-    //else
-    //{
-    //goto end;
-    //if(dij.dis[endPoint] != INF)
-    //{
-    //vector<int> vp = dij.endWith(endPoint);
-    //int cnt = vp.siz
-    //ans.insert(ans.end(),vp.begin(),vp.end());
-    //ans.push_back(endPoint);
-    //dfs(endPoint,dis + dij.dis[endPoint]);
-    //for(int i=0;i<vp.size()+1;i++){
-    //    ans.pop_back();
-    //}
-    //}
-    //return ;
-    //}
-
-
 }
 
+void bruteForce(int cur,int dis)
+{
+    //cout<<cur<<endl;
+    if(dis > bestLen )
+    {
+        return;
+    }
+    int now = (int)time(NULL);
+    int diff = now - startTime;
+    //cout<<diff<<endl;
+    if(diff > MAX_SEARCH_TIME)
+    {
+        return ;
+    }
+
+    if(isMustPoint[cur])
+    {
+        ++inPathVPCnt;
+    }
+    else if (cur == endPoint )
+    {
+        if(inPathVPCnt == mustPoints.size())
+        {
+            cout<<"find "<<dis<<endl;
+            bestLen = dis;
+            finalAns = ans;
+        }
+
+        return;
+    }
+    inRoad[cur] = true;
+    ans.push_back(cur);
+    int n = G[cur].size();
+    for(int i=0; i<n; i++)
+    {
+        Edge e = G[cur][i];
+        int nxPoint = e.v;
+        if(!inRoad[nxPoint])
+        {
+            bruteForce(nxPoint,dis + e.w);
+        }
+    }
+    ans.pop_back();
+    inRoad[cur] = false;
+    if(isMustPoint[cur])
+    {
+        --inPathVPCnt;
+    }
+
+}
 
 void solve()
 {
     dfs(startPoint,0 );
-
-    if(finalAns.size() != 0 )
+    //assert(inPathVPCnt == 0);
+    //assert(ans.size() == 0);
+    bruteForce(startPoint,0);
+    if(finalAns.size() != 0)
     {
         finalAns.push_back(endPoint);
         for(int i=0; i<finalAns.size()-1; i++)
         {
-            cout<<finalAns[i]<<","<<finalAns[i+1]<<endl;
-            //assert(edgeIdMap.count(MP(finalAns[i],finalAns[i+1])) !=0);
+            //cout<<finalAns[i]<<","<<finalAns[i+1]<<endl;
+            assert(edgeIdMap.count(MP(finalAns[i],finalAns[i+1])) !=0);
             int eid = edgeIdMap[MP(finalAns[i],finalAns[i+1])].id;
             record_result(eid);
             //cout<<ans[i]<<endl;
         }
     }
+    //}
 
 }
 
@@ -267,11 +331,15 @@ void search_route(char *topo[5000], int edge_num, char *demand)
     cur = strtok(NULL, "|");
     while (cur)
     {
-        mustPoints.insert(atoi(cur));
+        int v = atoi(cur);
+        mustPoints.insert(v);
+        isMustPoint[v] = true;
         cur = strtok(NULL, "|");
     }
 
     ::edge_num = edge_num;
+
+
     solve();
 
 }
