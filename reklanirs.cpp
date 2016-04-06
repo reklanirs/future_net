@@ -130,7 +130,7 @@ const int MAX_V = 1400;
 int mirrorl2r[MAX_V],mirrorr2l[MAX_V],mirror2Raw[MAX_V];
 bool mustPoint[MAX_V];
 int superS,superT;
-vii raw_mirror;
+vii raw_mirror,st_raw_mirror;
 
 struct Edge
 {
@@ -142,6 +142,8 @@ struct Ford
 {
     vector<Edge> G[MAX_V];
     bool used[MAX_V];
+    // int used[MAX_V]; 
+    // SI used[MAX_V];
 
 
     pii headtail[MAX_V]; //
@@ -176,13 +178,29 @@ struct Ford
             forbid2 = mirrorl2r[tmp.X];
             if(tmp.Y < mustPoints.size()) forbid3 = rawT;
         }
+        if(forbid1 < 0) forbid1 = -2;
+        if(forbid2 < 0) forbid2 = -2;
+        if(forbid3 < 0) forbid3 = -2;
+    }
+    void throughT(int v, int S){
+        int tmp = v;
+        while(tmp != superT){
+            headtail[tmp].X = S;
+            tmp = prenxt[tmp].Y;
+        }
+    }
+    void throughS(int v, int T){
+        int tmp = v;
+        while(tmp != superS){
+            headtail[tmp].Y = T;
+            tmp = prenxt[tmp].X;
+        }
     }
     int dfs(int v,int t,int f,int pre = -1, bool preEisrev = false){
         if(KK) printf("\tv:%d G[v].size():%d t:%d f:%d pre:%d preEisrev:%d\n",v,G[v].size(),t,f,pre,preEisrev );
         affectS.insert(headtail[v].X);
         affectT.insert(headtail[v].Y);
         if(v == t){
-            //
             curT = pre;
             // connectl2r[curS] = curT; connectr2l[curT] = curS;
             affectS.insert(curS);
@@ -191,13 +209,14 @@ struct Ford
         }
         if(KK) puts("a");
         used[v] = true;
+        // used[v].insert(curS);
         for(int i = 0; i < G[v].size(); i++){
             Edge &e = G[v][i];
-            if(KK) printf("\t\te: %d %d %d\n",e.to,e.cap,e.isrev);
+            if(KK) printf("\t\te: %d %d %d s:%d t:%d used:%d forbid1:%d 2:%d\n",e.to,e.cap,e.isrev, headtail[e.to].X, headtail[e.to].Y, used[e.to], forbid1, forbid2);
 
             //不能走到禁止节点,也不能掐断流向禁止节点的流
-            if(e.to == forbid1 || e.to == forbid2 || e.to == forbid3) continue;
-            if(headtail[e.to].Y == forbid1 || headtail[e.to].Y == forbid2 || headtail[e.to].Y == forbid3) continue;
+            if(e.to == forbid1 || e.to == forbid2 ) continue;
+            if(headtail[e.to].Y == forbid1 || headtail[e.to].Y == forbid2 ) continue;
             if(!used[e.to] && e.cap > 0){
 
                 //trigger
@@ -206,8 +225,10 @@ struct Ford
                 //掐断之前一条流. 需要更新curS,forbid
                 if(e.isrev){
                     if(KK) puts("c");
-                    int precurS = curS;
-                    curS = headtail[e.to].X;
+                    int precurS = curS, nxtcurS = headtail[e.to].X, nxtT = headtail[e.to].Y;
+                    throughT(v, curS);    
+                    throughS(e.to, -1);
+                    curS = nxtcurS;
                     trigger(curS);
 
                     int d = dfs(e.to, t, min(f, e.cap),v,true);
@@ -221,6 +242,8 @@ struct Ford
                     }else{
                         curS = precurS;
                         trigger(curS);
+                        throughT(v, nxtcurS);
+                        throughS(e.to, nxtT);
                     }
                 }else{
                     if(KK) puts("d");
@@ -239,6 +262,24 @@ struct Ford
         }
         return 0;
     }
+    void getthrough(){
+        rep(i,st_raw_mirror.size()){
+            int k = st_raw_mirror[i].X, tmp = k;
+            if(prenxt[tmp].Y == -1) continue;
+            while(tmp != superT){
+                headtail[tmp].X = k;
+                tmp = prenxt[tmp].Y;
+            }
+        }
+        rep(i,st_raw_mirror.size()){
+            int k = st_raw_mirror[i].Y, tmp = k;
+            if(prenxt[tmp].X == -1) continue;
+            while(tmp != superS){
+                headtail[tmp].Y = k;
+                tmp = prenxt[tmp].X;
+            }
+        }
+    }
     int MaxFlow(int s = superS,int t = superT){
         int flow = 0;
         rep(i,MAX_V) 
@@ -246,7 +287,8 @@ struct Ford
             headtail[i]=prenxt[i]=mkp(-1,-1);
         while(true){
             if(K) printf("curMaxFlow:%d\n", flow);
-            memset(used, 0, sizeof used);
+            memset(used, -1, sizeof used);
+            // rep(i,MAX_V) used[i].clear();
             affectS.clear();
             affectT.clear();
             forbid1 = forbid2 = forbid3 = -2;
@@ -259,25 +301,11 @@ struct Ford
             if(f == 0) return flow;
             flow += f;
 
-            for(SI::iterator ite = affectS.begin(); ite!=affectS.end(); ite++){
-                if(*ite < 0) continue;
-                int tmp = *ite;
-                while(tmp != superT){
-                    headtail[tmp].X = *ite;
-                    tmp = prenxt[tmp].Y;
-                }
-            }
-            for(SI::iterator ite = affectT.begin(); ite!=affectT.end(); ite++){
-                if(*ite < 0) continue;
-                int tmp = *ite;
-                while(tmp != superS){
-                    headtail[tmp].Y = *ite;
-                    tmp = prenxt[tmp].X;
-                }
-            }
+            getthrough();
+
             if(K){
-                printf("(%d-%d) ",rawS,headtail[rawS].Y );
-                for(int i:mustPoints) printf("(%d-%d)",i,mirrorr2l[headtail[i].Y] ); puts("");
+                rep(i,st_raw_mirror.size()) printf("(%3d:%3d)",st_raw_mirror[i].X,headtail[st_raw_mirror[i].X].Y); puts("");
+                rep(i,st_raw_mirror.size()) printf("(%3d:%3d)",st_raw_mirror[i].Y,headtail[st_raw_mirror[i].Y].X); puts("");
             }
         }
     }
@@ -292,7 +320,7 @@ struct Ford
                     printf(" - %d", tmp);
             }
             puts("");
-            for(int tmp : mustPoints){
+            for(int tmp:mustPoints){
                 printf("%d",tmp);
                 while(tmp != superT){
                     tmp = prenxt[tmp].Y;
@@ -338,7 +366,7 @@ struct Ford
 
 
 void makeGraph(){
-    raw_mirror.clear();
+    raw_mirror.clear(); st_raw_mirror.clear();
     memset(mirrorl2r, -1, sizeof mirrorl2r);
     memset(mirrorr2l, -1, sizeof mirrorr2l);
     memset(mirror2Raw, -1, sizeof mirror2Raw);
@@ -350,10 +378,11 @@ void makeGraph(){
     }
     superS = 2*rawN;
     superT = 2*rawN+1;
+    st_raw_mirror.pb(mkp(rawS,rawT));
     for(SI::iterator ite = mustPoints.begin(); ite!=mustPoints.end(); ite++){
         raw_mirror.pb(mkp(*ite,mirrorl2r[*ite]));
+        st_raw_mirror.pb(mkp(*ite,mirrorl2r[*ite]));
     }
-    // raw_mirror.pb(mkp(rawS,rawT));
 
     ford.AddEdge(-1,superS,rawS,1);
     rep(i,raw_mirror.size()){
