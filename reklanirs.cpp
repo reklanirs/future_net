@@ -7,7 +7,7 @@
 #define MAX_SEARCH_TIME 9
 */
 const int K = 1;
-const int KK = 0;
+const int KK = 1;
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -141,9 +141,9 @@ struct Edge
 struct Ford
 {
     vector<Edge> G[MAX_V];
-    bool used[MAX_V];
+    // bool used[MAX_V];
     // int used[MAX_V]; 
-    // SI used[MAX_V];
+    SI used[MAX_V];
 
 
     pii headtail[MAX_V]; //
@@ -157,15 +157,25 @@ struct Ford
         G[to].push_back((Edge){-1, from, 0, (int)G[from].size()-1,true});
     }
     pii findhead(int x){
+        assert(x>=0);
+        if(0) printf("findhead %d  head:%d  tail:%d tailhead:%d\n",x,headtail[x].X,headtail[x].Y , headtail[mirrorl2r[x]].X);
+        if(x == headtail[mirrorl2r[x]].X){
+            if(K){
+                rep(i,st_raw_mirror.size()) printf("(%3d:%3d)",st_raw_mirror[i].X,headtail[st_raw_mirror[i].X].Y); puts("");
+                rep(i,st_raw_mirror.size()) printf("(%3d:%3d)",st_raw_mirror[i].Y,headtail[st_raw_mirror[i].Y].X); puts("");
+            }
+            assert(0);
+        }
         if(!mustPoint[x]) return mkp(x,0);
-        if(prenxt[mirrorl2r[x]].X != -1){
-            pii tmp = findhead(prenxt[mirrorl2r[x]].X);
+        if(headtail[mirrorl2r[x]].X >= 0){
+            pii tmp = findhead(headtail[mirrorl2r[x]].X);
             return mkp(tmp.X,tmp.Y+1);
         }
         else return mkp(x,0);
     }
     void trigger(int v){
-        if(v == -1){
+        if(KK) printf("trigger %d\n", v);
+        if(v < 0){
             curS = -1; forbid1=forbid2=forbid3=-2;
         }else if(v == rawS){
             curS = rawS;
@@ -173,31 +183,41 @@ struct Ford
             forbid2 = rawS;
         }else if(mustPoint[v]){
             curS = v;
+            assert(curS>=0);
             forbid1 = mirrorl2r[curS];
             pii tmp = findhead(curS);
+            assert(tmp.X >= 0);
+            // printf("tmp %d %d",tmp.X,tmp.Y);
             forbid2 = mirrorl2r[tmp.X];
             if(tmp.Y < mustPoints.size()) forbid3 = rawT;
+
         }
         if(forbid1 < 0) forbid1 = -2;
         if(forbid2 < 0) forbid2 = -2;
         if(forbid3 < 0) forbid3 = -2;
+        if(KK) printf("trigger end\n");
     }
     void throughT(int v, int S){
+        if(KK) printf("throughT v:%d S:%d  head:%d tail:%d\n",v,S,headtail[v].X,headtail[v].Y);
+        if(KK) printf("forbid1:%d forbid2:%d\n",forbid1,forbid2 );
         int tmp = v;
-        while(tmp != superT){
+        while(tmp >= 0 && tmp != superT){
+            //printf("\t%d\n",tmp );
             headtail[tmp].X = S;
             tmp = prenxt[tmp].Y;
         }
     }
     void throughS(int v, int T){
+        if(KK) printf("throughS v:%d T:%d  head:%d tail:%d\n",v,T,headtail[v].X,headtail[v].Y);
         int tmp = v;
-        while(tmp != superS){
+        while(tmp >= 0 && tmp != superS){
+
             headtail[tmp].Y = T;
             tmp = prenxt[tmp].X;
         }
     }
     int dfs(int v,int t,int f,int pre = -1, bool preEisrev = false){
-        if(KK) printf("\tv:%d G[v].size():%d t:%d f:%d pre:%d preEisrev:%d\n",v,G[v].size(),t,f,pre,preEisrev );
+        if(KK) printf("\tv:%d G[v].size():%lu t:%d f:%d pre:%d preEisrev:%d\n",v,G[v].size(),t,f,pre,preEisrev );
         affectS.insert(headtail[v].X);
         affectT.insert(headtail[v].Y);
         if(v == t){
@@ -208,29 +228,36 @@ struct Ford
             return f;
         }
         if(KK) puts("a");
-        used[v] = true;
-        // used[v].insert(curS);
+        // used[v] = true;
+        used[v].insert(curS);
+        if(KK) printf("\t\tG[v].size:%lu\n",G[v].size());
         for(int i = 0; i < G[v].size(); i++){
             Edge &e = G[v][i];
-            if(KK) printf("\t\te: %d %d %d s:%d t:%d used:%d forbid1:%d 2:%d\n",e.to,e.cap,e.isrev, headtail[e.to].X, headtail[e.to].Y, used[e.to], forbid1, forbid2);
+            if(e.to == pre || e.to == superS) continue;
+            // if(KK) printf("\t\te: %d %d %d s:%d t:%d used:%d forbid1:%d 2:%d v:%d\n",e.to,e.cap,e.isrev, headtail[e.to].X, headtail[e.to].Y, used[e.to], forbid1, forbid2, v);
+            if(KK) printf("\t\te: %d %d %d s:%d t:%d used:%d forbid1:%d 2:%d v:%d\n",e.to,e.cap,e.isrev, headtail[e.to].X, headtail[e.to].Y, used[e.to].find(curS) != used[e.to].end(), forbid1, forbid2, v);
+
 
             //不能走到禁止节点,也不能掐断流向禁止节点的流
             if(e.to == forbid1 || e.to == forbid2 ) continue;
             if(headtail[e.to].Y == forbid1 || headtail[e.to].Y == forbid2 ) continue;
-            if(!used[e.to] && e.cap > 0){
 
+            if(KK) puts("aa");
+            // if(!used[e.to] && e.cap > 0){
+            if(used[e.to].find(curS) == used[e.to].end() && e.cap > 0){
+                if(KK) puts("b");
                 //trigger
                 if(e.to == rawS || mustPoint[e.to]) trigger(e.to);
-                if(KK) puts("b");
+                
                 //掐断之前一条流. 需要更新curS,forbid
                 if(e.isrev){
                     if(KK) puts("c");
                     int precurS = curS, nxtcurS = headtail[e.to].X, nxtT = headtail[e.to].Y;
                     throughT(v, curS);    
-                    throughS(e.to, -1);
+                    throughS(e.to, -3);
                     curS = nxtcurS;
                     trigger(curS);
-
+                    if(KK) puts("cc");
                     int d = dfs(e.to, t, min(f, e.cap),v,true);
                     if(d > 0){
                         if(preEisrev) prenxt[v] = mkp(-1,-1);
@@ -260,21 +287,29 @@ struct Ford
                 if(e.to == rawS || mustPoint[e.to]) trigger(-1);
             }
         }
+        if(KK) printf("\tv:%d return\n",v);
         return 0;
     }
     void getthrough(){
+        if(KK) puts("getthrough:");
         rep(i,st_raw_mirror.size()){
             int k = st_raw_mirror[i].X, tmp = k;
-            if(prenxt[tmp].Y == -1) continue;
+            if(prenxt[tmp].Y < 0) continue;
+            if(KK) printf("k:%d\n",k );
             while(tmp != superT){
+                if(KK) printf("\ttmp:%d\n",tmp);
+                assert(tmp>=0);
                 headtail[tmp].X = k;
                 tmp = prenxt[tmp].Y;
             }
         }
         rep(i,st_raw_mirror.size()){
             int k = st_raw_mirror[i].Y, tmp = k;
-            if(prenxt[tmp].X == -1) continue;
+            if(prenxt[tmp].X < 0) continue;
+            if(KK) printf("k:%d\n",k );
             while(tmp != superS){
+                if(KK) printf("\ttmp:%d\n",tmp);
+                assert(tmp>=0);
                 headtail[tmp].Y = k;
                 tmp = prenxt[tmp].X;
             }
@@ -287,10 +322,11 @@ struct Ford
             headtail[i]=prenxt[i]=mkp(-1,-1);
         while(true){
             if(K) printf("curMaxFlow:%d\n", flow);
-            memset(used, -1, sizeof used);
-            // rep(i,MAX_V) used[i].clear();
+            // memset(used, 0, sizeof used);
+            rep(i,MAX_V) used[i].clear();
             affectS.clear();
             affectT.clear();
+            trigger(-1);
             forbid1 = forbid2 = forbid3 = -2;
 
             int f = dfs(s, t, INF);
@@ -298,31 +334,28 @@ struct Ford
             if(K){
                 printf("\tf:%d curS:%d curT:%d\n",f,curS,curT);
             }
+            getthrough();
             if(f == 0) return flow;
             flow += f;
 
-            getthrough();
-
+            
+            puts("a");
             if(K){
                 rep(i,st_raw_mirror.size()) printf("(%3d:%3d)",st_raw_mirror[i].X,headtail[st_raw_mirror[i].X].Y); puts("");
                 rep(i,st_raw_mirror.size()) printf("(%3d:%3d)",st_raw_mirror[i].Y,headtail[st_raw_mirror[i].Y].X); puts("");
             }
+            puts("Loop end");
         }
     }
 
     void output(){
+        return;
         if(K){
             printf("\ndetail graph:\n");
-            int tmp = rawS; printf("%d",tmp);
-            while(tmp != superT){
-                tmp = prenxt[tmp].Y;
-                // if(tmp < rawN)
-                    printf(" - %d", tmp);
-            }
-            puts("");
-            for(int tmp:mustPoints){
+            rep(i,st_raw_mirror.size()){
+                int tmp = st_raw_mirror[i].X;
                 printf("%d",tmp);
-                while(tmp != superT){
+                while(tmp >= 0 && tmp != superT){
                     tmp = prenxt[tmp].Y;
                     // if(tmp < rawN)
                         printf(" - %d", tmp);
@@ -424,7 +457,7 @@ void solve(){
     makeGraph();
     if(K){
         puts("makeGraph end");
-        printf("superS:%d superT:%d mustnodenum:%d\n", superS, superT, mustPoints.size());
+        printf("superS:%d superT:%d mustnodenum:%lu\n", superS, superT, mustPoints.size());
         printf("left : %2d",rawS ); for(int i:mustPoints) printf(" %2d",i ); puts("");
         printf("right: %2d",rawT ); for(int i:mustPoints) printf(" %2d",mirrorl2r[i] ); puts("");
     }
